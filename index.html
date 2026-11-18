@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exercise Counter</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f0f14;
+      color: #e8e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: #1a1a24;
+      border-bottom: 1px solid #2a2a3a;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #a78bfa;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+
+    .btn-primary {
+      background: #7c3aed;
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: #6d28d9; }
+
+    .btn-ghost {
+      background: #2a2a3a;
+      color: #c4b5fd;
+    }
+    .btn-ghost:hover:not(:disabled) { background: #3a3a4a; }
+
+    .btn-danger {
+      background: #3f1515;
+      color: #f87171;
+    }
+    .btn-danger:hover:not(:disabled) { background: #5a1f1f; }
+
+    /* ── MAIN LAYOUT ── */
+    main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Camera panel */
+    .camera-panel {
+      flex: 1;
+      position: relative;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* mirror */
+      display: block;
+    }
+
+    #overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transform: scaleX(-1); /* mirror to match video */
+    }
+
+    /* Start / permission overlay */
+    .start-screen {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 10, 20, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      z-index: 10;
+      padding: 24px;
+      text-align: center;
+    }
+    .start-screen.hidden { display: none; }
+
+    .start-screen .icon { font-size: 3.5rem; }
+    .start-screen h2 { font-size: 1.4rem; font-weight: 700; color: #c4b5fd; }
+    .start-screen p  { color: #9ca3af; font-size: 0.9rem; line-height: 1.6; max-width: 340px; }
+
+    /* Calibration bar */
+    .calib-bar-wrap {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 5;
+      padding: 10px 16px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    }
+    .calib-label {
+      font-size: 0.78rem;
+      color: #c4b5fd;
+      margin-bottom: 5px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .calib-bar-bg {
+      height: 6px;
+      background: #2a2a3a;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .calib-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7c3aed, #a78bfa);
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+    .calib-bar-wrap.hidden { display: none; }
+
+    /* Stats panel */
+    .stats-panel {
+      width: 220px;
+      flex-shrink: 0;
+      background: #1a1a24;
+      border-left: 1px solid #2a2a3a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      overflow-y: auto;
+    }
+
+    /* ── Exercise tabs ── */
+    .exercise-tabs {
+      display: flex;
+      width: 100%;
+      border-bottom: 1px solid #2a2a3a;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: #6b7280;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 11px 6px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      line-height: 1.3;
+    }
+    .tab-btn:hover { background: #22223a; color: #c4b5fd; }
+    .tab-btn.active {
+      color: #a78bfa;
+      border-bottom-color: #7c3aed;
+      background: #1e1e30;
+    }
+    .tab-btn:disabled { opacity: 0.35; cursor: default; }
+
+    .stats-inner {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding: 24px 16px;
+      width: 100%;
+    }
+
+    .counter-block {
+      text-align: center;
+    }
+    .counter-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+    .counter-value {
+      font-size: 5.5rem;
+      font-weight: 800;
+      line-height: 1;
+      color: #a78bfa;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.25s;
+    }
+    .counter-value.flash {
+      color: #34d399;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 18px;
+      border-radius: 100px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      transition: background 0.2s, color 0.2s;
+    }
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    .status-badge.calibrating { background: #1e1634; color: #a78bfa; }
+    .status-badge.calibrating .status-dot { background: #7c3aed; animation: pulse 1s ease-in-out infinite; }
+
+    /* Hip raise states */
+    .status-badge.down { background: #1a2535; color: #60a5fa; }
+    .status-badge.down .status-dot { background: #3b82f6; }
+
+    .status-badge.up { background: #142620; color: #34d399; }
+    .status-badge.up .status-dot { background: #10b981; }
+
+    /* Hamstring walk states */
+    .status-badge.in { background: #1a2535; color: #60a5fa; }
+    .status-badge.in .status-dot { background: #3b82f6; }
+
+    .status-badge.out { background: #142620; color: #34d399; }
+    .status-badge.out .status-dot { background: #10b981; }
+
+    /* Calf raise states */
+    .status-badge.flat { background: #1a2535; color: #60a5fa; }
+    .status-badge.flat .status-dot { background: #3b82f6; }
+
+    .status-badge.tiptoe { background: #142620; color: #34d399; }
+    .status-badge.tiptoe .status-dot { background: #10b981; }
+
+    /* Model loading state */
+    .status-badge.loading { background: #1e1634; color: #a78bfa; }
+    .status-badge.loading .status-dot { background: #7c3aed; animation: pulse 1s ease-in-out infinite; }
+
+    .status-badge.waiting { background: #1f1f29; color: #6b7280; }
+    .status-badge.waiting .status-dot { background: #4b5563; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Voice toggle */
+    .voice-toggle {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .voice-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #6b7280;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      cursor: pointer;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: #2a2a3a;
+      border-radius: 13px;
+      transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 20px;
+      height: 20px;
+      background: #6b7280;
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-track { background: #4c1d95; }
+    .toggle-switch input:checked + .toggle-track::after {
+      transform: translateX(22px);
+      background: #a78bfa;
+    }
+
+    .divider {
+      width: 100%;
+      border: none;
+      border-top: 1px solid #2a2a3a;
+    }
+
+    .recal-btn {
+      width: 100%;
+      font-size: 0.78rem;
+      padding: 8px;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      main { flex-direction: column; }
+      .stats-panel {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid #2a2a3a;
+      }
+      .exercise-tabs { justify-content: center; }
+      .stats-inner {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-around;
+        padding: 12px 16px;
+        gap: 14px;
+      }
+      .counter-value { font-size: 3.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1 id="headerTitle">Exercise Counter</h1>
+  <div class="header-controls">
+    <button id="resetBtn" class="btn btn-danger" disabled>Reset</button>
+  </div>
+</header>
+
+<main>
+  <!-- Camera panel -->
+  <div class="camera-panel">
+    <!-- Start screen -->
+    <div class="start-screen" id="startScreen">
+      <div class="icon" id="startIcon">🏋️</div>
+      <h2 id="startTitle">Exercise Counter</h2>
+      <p id="startDesc">Select an exercise, position your camera so your full body is visible from the side, then press Start.</p>
+      <button id="startBtn" class="btn btn-primary">Start Camera</button>
+      <p id="permError" style="color:#f87171; font-size:0.82rem; display:none;"></p>
+    </div>
+
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="overlay"></canvas>
+
+    <!-- Calibration progress -->
+    <div class="calib-bar-wrap hidden" id="calibWrap">
+      <div class="calib-label" id="calibLabel">Calibrating — hold starting position…</div>
+      <div class="calib-bar-bg"><div class="calib-bar-fill" id="calibFill"></div></div>
+    </div>
+  </div>
+
+  <!-- Stats panel -->
+  <div class="stats-panel">
+    <!-- Tabs built dynamically by main.js -->
+    <div class="exercise-tabs" id="exerciseTabs"></div>
+
+    <div class="stats-inner">
+      <div class="counter-block">
+        <div class="counter-label">Reps</div>
+        <div class="counter-value" id="repCount">0</div>
+      </div>
+
+      <div class="status-badge waiting" id="statusBadge">
+        <div class="status-dot"></div>
+        <span id="statusText">Waiting</span>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="voice-toggle">
+        <div class="voice-label">Voice</div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="voiceToggle" checked />
+          <div class="toggle-track"></div>
+        </label>
+      </div>
+
+      <button id="recalBtn" class="btn btn-ghost recal-btn" disabled>Recalibrate</button>
+    </div>
+  </div>
+</main>
+
+<!-- TensorFlow.js + MoveNet -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.20.0/dist/tf-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.20.0/dist/tf-converter.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.20.0/dist/tf-backend-webgl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
